@@ -40,13 +40,13 @@ impl B17 {
     }
 }
 
-struct B17Iter<'a> {
+struct B8ToB17Iter<'a> {
     data: &'a [u8],
     index: usize,
     bit_offset: usize,
 }
 
-impl<'a> B17Iter<'a> {
+impl<'a> B8ToB17Iter<'a> {
     fn new(data: &'a [u8]) -> Self {
         Self {
             data,
@@ -56,7 +56,7 @@ impl<'a> B17Iter<'a> {
     }
 }
 
-impl<'a> Iterator for B17Iter<'a> {
+impl<'a> Iterator for B8ToB17Iter<'a> {
     type Item = B17;
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.data.len() {
@@ -110,19 +110,42 @@ mod tests {
     }
 
     #[test]
-    fn b17_iter() {
-        const BYTES: &[u8] = &[
-            0b0001_0001,
-            0b0010_0010,
-            0b0011_0011,
-            0b0100_0100,
-            0b0101_0101,
-            0b0110_0110,
-            0b0111_0111,
-            0b1000_1000,
-        ];
+    fn b8_to_b17_iter() {
+        assert_eq!(B8ToB17Iter::new(&[]).collect::<Vec<_>>(), vec![]);
         assert_eq!(
-            B17Iter::new(BYTES).into_iter().collect::<Vec<_>>(),
+            B8ToB17Iter::new(&[1]).collect::<Vec<_>>(),
+            vec![
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b0000_0001_0000_0000_0)
+            ]
+        );
+        assert_eq!(
+            B8ToB17Iter::new(&[1, 2]).collect::<Vec<_>>(),
+            vec![
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b0000_0001_0000_0010_0)
+            ]
+        );
+        assert_eq!(
+            B8ToB17Iter::new(&[1, 2, 3]).collect::<Vec<_>>(),
+            vec![
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b0000_0001_0000_0010_0),
+                B17(0b000_0011_0000_0000_00)
+            ]
+        );
+        assert_eq!(
+            B8ToB17Iter::new(&[
+                0b0001_0001,
+                0b0010_0010,
+                0b0011_0011,
+                0b0100_0100,
+                0b0101_0101,
+                0b0110_0110,
+                0b0111_0111,
+                0b1000_1000,
+            ])
+            .collect::<Vec<_>>(),
             vec![
                 #[allow(clippy::unusual_byte_groupings)]
                 B17(0b0001_0001_0010_0010_0),
@@ -132,6 +155,49 @@ mod tests {
                 #[allow(clippy::unusual_byte_groupings)]
                 B17(0b1_0111_1000_1000_0000)
             ]
-        )
+        );
+        assert_eq!(
+            B8ToB17Iter::new(&[
+                0b0000_0001,
+                0b0000_0010,
+                0b0000_0011,
+                0b0000_0100,
+                0b0000_0101,
+                0b0000_0110,
+                0b0000_0111,
+                0b0000_1000,
+                0b0000_1001,
+                0b0000_1010,
+                0b0000_1011,
+                0b0000_1100,
+                0b0000_1101,
+                0b0000_1110,
+                0b0000_1111,
+                0b0001_0000,
+                0b0001_0001,
+                0b0001_0010,
+                0b0001_0011,
+                0b0001_0100,
+            ])
+            .collect::<Vec<_>>(),
+            vec![
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b0000_0001_0000_0010_0),
+                B17(0b000_0011_0000_0100_00),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b00_0101_0000_0110_000),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b0_0111_0000_1000_0000),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b1001_0000_1010_0000_1),
+                B17(0b011_0000_1100_0000_11),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b01_0000_1110_0000_111),
+                B17(0b1_0001_0000_0001_0001),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b0001_0010_0001_0011_0),
+                B17(0b001_0100_0000_0000_00),
+            ]
+        );
     }
 }
