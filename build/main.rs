@@ -4,7 +4,7 @@ use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 use std::process::Command;
 
-const LOOKUP_TABLE_SIZE: usize = 1 << 17;
+const LOOKUP_TABLE_SIZE: usize = (1 << 17) + 2;
 
 const OUT_FILE: &str = "src/lookup_table.rs";
 
@@ -120,7 +120,9 @@ fn main() -> io::Result<()> {
     if Path::new(OUT_FILE).exists() {
         return Ok(());
     }
-    let code_points = read_all_codepoints()?;
+    let mut code_points = read_all_codepoints()?;
+    let pad1 = code_points.pop().unwrap();
+    let pad2 = code_points.pop().unwrap();
     let code_point_ranges = Ranges::new(&code_points).collect::<Vec<_>>();
     let code = format!(
         r#"
@@ -131,6 +133,10 @@ fn main() -> io::Result<()> {
 //! 2. Delete the `src/lookup_table.rs` file
 //! 3. Run `cargo build`
 
+/// The extra symbol if the encoding was padded by 1 byte
+pub const PAD1: u32 = {pad1};
+/// The extra symbol if the encoding was padded by 2 bytes
+pub const PAD2: u32 = {pad2};
 /// A Lookup Table with `(table_offset, range_start, range_end)` of valid unicode code points
 pub const LOOKUP_TABLE: &[(u32, u32, u32)] = &{code_point_ranges:?};
     "#

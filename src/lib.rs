@@ -1,7 +1,7 @@
 mod lookup_table;
 
 use core::cmp::Ordering;
-use lookup_table::LOOKUP_TABLE;
+use lookup_table::{LOOKUP_TABLE, PAD1, PAD2};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct B17(u32);
@@ -108,11 +108,14 @@ impl<'a> Iterator for B17ToB8Iter<'a> {
         if self.bit_offset > 9 {
             let mut next = (self.data[self.index].0 << self.bit_offset >> 9) as u8;
             println!("res* {:#010b} {}", next, next);
-            self.bit_offset -= 9;
             self.index += 1;
             if self.index >= self.data.len() {
+                if self.bit_offset == 17 {
+                    return None;
+                }
                 return Some(next);
             }
+            self.bit_offset -= 9;
             println!("next {:#019b}", self.data[self.index].0);
             next |= (self.data[self.index].0 >> (17 - self.bit_offset)) as u8;
             println!("res! {:#010b} {}", next, next);
@@ -123,6 +126,25 @@ impl<'a> Iterator for B17ToB8Iter<'a> {
             println!("res= {:#010b} {}", next, next);
             Some(next)
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Padding {
+    Pad1,
+    Pad2,
+}
+
+fn calc_padding(byte_size: usize) -> Option<Padding> {
+    let bits = byte_size * 8;
+    if bits % 17 == 0 {
+        None
+    } else {
+        Some(match (16 - (bits % 17)) / 8 {
+            0 => Padding::Pad1,
+            1 => Padding::Pad2,
+            _ => unreachable!(),
+        })
     }
 }
 
@@ -200,6 +222,43 @@ mod tests {
                 B17(0b01_0101_0110_0110_011),
                 #[allow(clippy::unusual_byte_groupings)]
                 B17(0b1_0111_1000_1000_0000)
+            ]
+        );
+        assert_eq!(
+            B8ToB17Iter::new(&[
+                0b0000_0001,
+                0b0000_0010,
+                0b0000_0011,
+                0b0000_0100,
+                0b0000_0101,
+                0b0000_0110,
+                0b0000_0111,
+                0b0000_1000,
+                0b0000_1001,
+                0b0000_1010,
+                0b0000_1011,
+                0b0000_1100,
+                0b0000_1101,
+                0b0000_1110,
+                0b0000_1111,
+                0b0001_0000,
+                0b0001_0001,
+            ])
+            .collect::<Vec<_>>(),
+            vec![
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b0000_0001_0000_0010_0),
+                B17(0b000_0011_0000_0100_00),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b00_0101_0000_0110_000),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b0_0111_0000_1000_0000),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b1001_0000_1010_0000_1),
+                B17(0b011_0000_1100_0000_11),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b01_0000_1110_0000_111),
+                B17(0b1_0001_0000_0001_0001),
             ]
         );
         assert_eq!(
@@ -314,6 +373,43 @@ mod tests {
                 #[allow(clippy::unusual_byte_groupings)]
                 B17(0b01_0000_1110_0000_111),
                 B17(0b1_0001_0000_0001_0001),
+            ])
+            .collect::<Vec<_>>(),
+            vec![
+                0b0000_0001,
+                0b0000_0010,
+                0b0000_0011,
+                0b0000_0100,
+                0b0000_0101,
+                0b0000_0110,
+                0b0000_0111,
+                0b0000_1000,
+                0b0000_1001,
+                0b0000_1010,
+                0b0000_1011,
+                0b0000_1100,
+                0b0000_1101,
+                0b0000_1110,
+                0b0000_1111,
+                0b0001_0000,
+                0b0001_0001,
+            ]
+        );
+        assert_eq!(
+            B17ToB8Iter::new(&[
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b0000_0001_0000_0010_0),
+                B17(0b000_0011_0000_0100_00),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b00_0101_0000_0110_000),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b0_0111_0000_1000_0000),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b1001_0000_1010_0000_1),
+                B17(0b011_0000_1100_0000_11),
+                #[allow(clippy::unusual_byte_groupings)]
+                B17(0b01_0000_1110_0000_111),
+                B17(0b1_0001_0000_0001_0001),
                 #[allow(clippy::unusual_byte_groupings)]
                 B17(0b0001_0010_0001_0011_0),
                 B17(0b001_0100_0000_0000_00),
@@ -344,5 +440,16 @@ mod tests {
                 0
             ]
         );
+    }
+
+    #[test]
+    fn test_padding() {
+        assert_eq!(calc_padding(0), None);
+        assert_eq!(calc_padding(1), Some(Padding::Pad2));
+        assert_eq!(calc_padding(2), Some(Padding::Pad1));
+        assert_eq!(calc_padding(3), Some(Padding::Pad2));
+        assert_eq!(calc_padding(8), Some(Padding::Pad1));
+        assert_eq!(calc_padding(17), None);
+        assert_eq!(calc_padding(20), Some(Padding::Pad2));
     }
 }

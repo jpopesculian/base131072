@@ -5,6 +5,10 @@
 //! 2. Delete the `src/lookup_table.rs` file
 //! 3. Run `cargo build`
 
+/// The extra symbol if the encoding was padded by 1 byte
+pub const PAD1: u32 = 191033;
+/// The extra symbol if the encoding was padded by 2 bytes
+pub const PAD2: u32 = 191032;
 /// A Lookup Table with `(table_offset, range_start, range_end)` of valid unicode code points
 pub const LOOKUP_TABLE: &[(u32, u32, u32)] = &[
     (0, 32, 126),
