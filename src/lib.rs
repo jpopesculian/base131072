@@ -179,7 +179,12 @@ pub fn encode<T: AsRef<[u8]>>(input: T) -> String {
 
 /// The error encountered when decoding an invalid Base2048 string
 #[derive(Debug, Clone, Copy)]
-pub struct InvalidChar(pub usize, pub char);
+pub struct InvalidChar(
+    /// The char index of the invalid character
+    pub usize,
+    /// The invalid character
+    pub char,
+);
 
 impl fmt::Display for InvalidChar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
