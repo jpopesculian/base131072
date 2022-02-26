@@ -1,12 +1,20 @@
 //! I originally made this crate in order to pack some data into tweets. However halfway through
 //! making the crate, I discovered [with the help of a very helpful
 //! table](https://github.com/qntm/base2048) that Twitter weights its characters, and that
-//! Base131072 is not actually the most efficiet way to encode information on Twitter, but rather
+//! Base131072 is not actually the most efficient way to encode information on Twitter, but rather
 //! Base2048. [Another very good crate](https://docs.rs/base2048/2.0.2/base2048) implements
 //! Base2048.
 //!
 //! However, this crate should still work, should you want to encode something Base131072 for some
 //! reason!
+
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{string::String, vec::Vec};
 
 mod lookup_table;
 
@@ -114,11 +122,8 @@ impl<'a> Iterator for B17ToB8Iter<'a> {
         if self.index >= self.data.len() {
             return None;
         }
-        println!("this {:#019b}", self.data[self.index].0);
-        println!("{}", self.bit_offset);
         if self.bit_offset > 9 {
-            let mut next = (self.data[self.index].0 << self.bit_offset >> 9) as u8;
-            println!("res* {:#010b} {}", next, next);
+            let mut next = (self.data[self.index].0 << (self.bit_offset - 9)) as u8;
             self.index += 1;
             if self.index >= self.data.len() {
                 if self.bit_offset == 17 {
@@ -127,14 +132,11 @@ impl<'a> Iterator for B17ToB8Iter<'a> {
                 return Some(next);
             }
             self.bit_offset -= 9;
-            println!("next {:#019b}", self.data[self.index].0);
             next |= (self.data[self.index].0 >> (17 - self.bit_offset)) as u8;
-            println!("res! {:#010b} {}", next, next);
             Some(next)
         } else {
             let next = (self.data[self.index].0 >> (9 - self.bit_offset)) as u8;
             self.bit_offset += 8;
-            println!("res= {:#010b} {}", next, next);
             Some(next)
         }
     }
@@ -188,6 +190,7 @@ impl fmt::Display for InvalidChar {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for InvalidChar {}
 
 /// Decode a base131072 encoded string
@@ -397,7 +400,6 @@ mod tests {
             .collect::<Vec<_>>(),
             vec![1, 2, 0],
         );
-        println!();
         assert_eq!(
             B17ToB8Iter::new(&[
                 #[allow(clippy::unusual_byte_groupings)]
