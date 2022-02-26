@@ -1,6 +1,14 @@
 [package]
 name = "base131072"
 version = "0.1.0"
+description = "Base131072 encoding"
+authors = ["Julian Popescu <jpopesculian@gmail.com>"]
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/jpopesculian/base131072"
+documentation = "https://docs.rs/base131072/"
+repository = "https://github.com/jpopesculian/base131072"
+keywords = ["text", "utility", "parsing", "string", "encoding"]
+categories = ["encoding"]
 edition = "2021"
 build = "build/main.rs"
 
