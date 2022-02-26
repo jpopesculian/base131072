@@ -1,6 +1,17 @@
+//! I originally made this crate in order to pack some data into tweets. However halfway through
+//! making the crate, I discovered [with the help of a very helpful
+//! table](https://github.com/qntm/base2048) that Twitter weights its characters, and that
+//! Base131072 is not actually the most efficiet way to encode information on Twitter, but rather
+//! Base2048. [Another very good crate](https://docs.rs/base2048/2.0.2/base2048) implements
+//! Base2048.
+//!
+//! However, this crate should still work, should you want to encode something Base131072 for some
+//! reason!
+
 mod lookup_table;
 
 use core::cmp::Ordering;
+use core::fmt;
 use lookup_table::{LOOKUP_TABLE, PAD1, PAD2};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -130,7 +141,7 @@ impl<'a> Iterator for B17ToB8Iter<'a> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum Padding {
+enum Padding {
     Pad1,
     Pad2,
 }
@@ -146,6 +157,67 @@ fn calc_padding(byte_size: usize) -> Option<Padding> {
             _ => unreachable!(),
         })
     }
+}
+
+/// Encode some bytes to a base131072 encoded string
+pub fn encode<T: AsRef<[u8]>>(input: T) -> String {
+    let input = input.as_ref();
+    let mut out = String::with_capacity(input.len() * 8 / 17);
+    for b17 in B8ToB17Iter::new(input) {
+        out.push(b17.encode());
+    }
+    if let Some(padding) = calc_padding(input.len()) {
+        match padding {
+            Padding::Pad1 => out.push(unsafe { char::from_u32_unchecked(PAD1) }),
+            Padding::Pad2 => out.push(unsafe { char::from_u32_unchecked(PAD2) }),
+        }
+    }
+    out
+}
+
+/// The error encountered when decoding an invalid Base2048 string
+#[derive(Debug, Clone, Copy)]
+pub struct InvalidChar(usize, char);
+
+impl fmt::Display for InvalidChar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!(
+            "invalid char '{}' encountered at character number {}",
+            self.1, self.0
+        ))
+    }
+}
+
+impl std::error::Error for InvalidChar {}
+
+/// Decode a base131072 encoded string
+pub fn decode<T: AsRef<str>>(input: T) -> Result<Vec<u8>, InvalidChar> {
+    let mut string = input.as_ref();
+    if string.is_empty() {}
+    let padding = if let Some(ch) = string.chars().last() {
+        match ch as u32 {
+            PAD1 => 1,
+            PAD2 => 2,
+            _ => 0,
+        }
+    } else {
+        return Ok(Vec::new());
+    };
+    if padding > 0 {
+        let last_char_index = string.char_indices().last().unwrap().0;
+        string = &string[..last_char_index];
+    }
+    let mut b17s = Vec::with_capacity(string.len());
+    for (idx, ch) in string.chars().enumerate() {
+        if let Some(b17) = B17::decode(ch) {
+            b17s.push(b17);
+        } else {
+            return Err(InvalidChar(idx, ch));
+        }
+    }
+    let mut bytes = B17ToB8Iter::new(&b17s).collect::<Vec<_>>();
+    bytes.truncate(bytes.len() - padding);
+    Ok(bytes)
 }
 
 #[cfg(test)]
@@ -451,5 +523,22 @@ mod tests {
         assert_eq!(calc_padding(8), Some(Padding::Pad1));
         assert_eq!(calc_padding(17), None);
         assert_eq!(calc_padding(20), Some(Padding::Pad2));
+    }
+
+    #[test]
+    fn encoding() {
+        assert_eq!(decode(encode(&[])).unwrap(), &[]);
+        assert_eq!(decode(encode(&[1])).unwrap(), &[1]);
+        assert_eq!(decode(encode(&[1, 2])).unwrap(), &[1, 2]);
+        assert_eq!(decode(encode(&[1, 2, 3])).unwrap(), &[1, 2, 3]);
+        assert_eq!(
+            decode(encode((0..17).collect::<Vec<_>>())).unwrap(),
+            (0..17).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            decode(encode((0..255).collect::<Vec<_>>())).unwrap(),
+            (0..255).collect::<Vec<_>>()
+        );
+        assert_eq!(decode(encode(vec![100; 1024])).unwrap(), vec![100; 1024]);
     }
 }
