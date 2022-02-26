@@ -3,27 +3,22 @@ mod lookup_table;
 use core::cmp::Ordering;
 use lookup_table::LOOKUP_TABLE;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-enum Error {
-    InvalidCodePoint(u32),
-}
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct B17(u32);
 
 impl B17 {
-    fn encode(self) -> u32 {
+    fn encode(self) -> char {
         match LOOKUP_TABLE.binary_search_by_key(&self.0, |&(idx, _, _)| idx) {
-            Ok(lookup_idx) => LOOKUP_TABLE[lookup_idx].1,
+            Ok(lookup_idx) => unsafe { char::from_u32_unchecked(LOOKUP_TABLE[lookup_idx].1) },
             Err(lookup_idx) => {
                 let (idx, start, _) = LOOKUP_TABLE[lookup_idx - 1];
-                println!("{} {} {}", self.0, idx, start);
-                self.0 - idx + start
+                unsafe { char::from_u32_unchecked(self.0 - idx + start) }
             }
         }
     }
 
-    fn decode(code_point: u32) -> Result<Self, Error> {
+    fn decode(ch: char) -> Option<Self> {
+        let code_point = ch as u32;
         let lookup_idx = LOOKUP_TABLE
             .binary_search_by(|&(_, start, stop)| {
                 if start > code_point {
@@ -34,9 +29,9 @@ impl B17 {
                     Ordering::Equal
                 }
             })
-            .map_err(|_| Error::InvalidCodePoint(code_point))?;
+            .ok()?;
         let (idx, start, _) = LOOKUP_TABLE[lookup_idx];
-        Ok(Self(code_point - start + idx))
+        Some(Self(code_point - start + idx))
     }
 }
 
@@ -100,6 +95,12 @@ mod tests {
             (1 << 17) - 2,
             (1 << 17) / 2,
             (1 << 17) / 3,
+            (1 << 17) / 4,
+            (1 << 17) / 5,
+            (1 << 17) / 6,
+            (1 << 17) / 7,
+            (1 << 17) / 8,
+            (1 << 17) / 9,
         ];
         for &test_case in B17_TEST_CASES {
             assert_eq!(
